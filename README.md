@@ -7,7 +7,7 @@ This uses Blizzard's own **Windows ARM64** WoW client, so the game itself runs n
 > Unofficial community project. Not affiliated with or endorsed by Blizzard Entertainment. You need your own Battle.net account with WoW Forever access. This repo and its releases contain **no** Blizzard game files.
 
 ---
-https://github.com/Enrico-Programador/wow-forever-android/actions/runs/43937908661
+https://github.com/Enrico-Programador/wow-forever-android/actions/runs/43946185699
 ## Supported devices
 
 | Device | Status |
