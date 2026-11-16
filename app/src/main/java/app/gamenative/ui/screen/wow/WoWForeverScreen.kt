@@ -1180,12 +1180,24 @@ private const val ADRENO_8XX_DRIVER = "Turnip-V32-RP6sched"
 private const val PROTON_VERSION = "proton-11.0-90624-arm64ec"
 private const val DXVK_VERSION = "2.4.1-wow-aarch64-test"
 
-private data class GpuProfile(val driver: String, val tuDebug: String, val screenSize: String, val label: String, val edition: String) {
+private data class GpuProfile(val driver: String, val tuDebug: String, val screenSize: String, val label: String, val edition: String, val useSystemDriver: Boolean = false) {
     companion object {
-        fun detect(context: Context) = if (isAdreno8xxDevice(context)) {
+                fun detect(context: Context) = if (isExynosDevice()) {
+            GpuProfile(DEFAULT_DRIVER, "noconform", "1280x720", "Exynos / Xclipse", "Samsung Exynos / Xclipse (experimental)", useSystemDriver = true)
+        } else if (isAdreno8xxDevice(context)) {
             GpuProfile(ADRENO_8XX_DRIVER, "noconform,sysmem", "1280x720", "Adreno 8xx", "Snapdragon 8 Elite / Adreno 8xx")
         } else {
             GpuProfile(DEFAULT_DRIVER, "noconform", "1920x1080", "Adreno 740", "Snapdragon 8 Series / Adreno 740")
+        }
+
+        private fun isExynosDevice(): Boolean {
+            val hw = Build.HARDWARE.lowercase()
+            if (hw.contains("exynos") || hw.startsWith("s5e")) return true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val soc = Build.SOC_MODEL.lowercase()
+                if (soc.contains("exynos") || soc.startsWith("s5e")) return true
+            }
+            return false
         }
 
         private fun isAdreno8xxDevice(context: Context): Boolean {
@@ -1272,8 +1284,7 @@ private fun containerConfig(gameRoot: File, gpu: GpuProfile, screenSize: String,
         put("screenSize", screenSize)
         put("envVars", envVars)
         put("graphicsDriver", "Wrapper")
-        put("graphicsDriverVersion", gpu.driver)
-        put("graphicsDriverConfig", "version=${gpu.driver},adrenotoolsTurnip=1,resourceType=buffer,bcnEmulation=auto,quality=high")
+        put("graphicsDriverConfig", "version=${gpu.driver},adrenotoolsTurnip=${if (gpu.useSystemDriver) 0 else 1},resourceType=buffer,bcnEmulation=auto,quality=high")
         put("displayRenderer", "vulkan")
         put("dxwrapper", "dxvk-$DXVK_VERSION-1")
         put("dxwrapperConfig", "version=$DXVK_VERSION-1")
