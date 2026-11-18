@@ -1275,16 +1275,31 @@ private fun prepareLaunch(context: Context, gameRoot: File, gpu: GpuProfile, scr
     return CONTAINER_ID
 }
 
+private fun readExynosOverrides(gameRoot: File): Map<String, String> {
+    val f = File(gameRoot, "exynos_overrides.txt")
+    if (!f.exists()) return emptyMap()
+    return f.readLines().map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { it.substringBefore("=").trim() to it.substringAfter("=").trim() }
+}
+
 private fun containerConfig(gameRoot: File, gpu: GpuProfile, screenSize: String, identity: WowMachineIdentity): JSONObject {
     val samsungEnv = if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) " FD_DEV_FEATURES=enable_tp_ubwc_flag_hint=1" else ""
-    val envVars = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=0 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=${gpu.tuDebug} VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144  ${WowMachineIdentity.HOSTNAME_ENV}=${identity.computerName}$samsungEnv DXVK_LOG_LEVEL=info DXVK_LOG_PATH=/storage/emulated/0/Download"
+        val overrides = if (gpu.useSystemDriver) readExynosOverrides(gameRoot) else emptyMap()
+    val extraEnv = overrides.filterKeys { it.startsWith("env.") }
+        .entries.joinToString("") { " ${it.key.removePrefix("env.")}=${it.value}" }
+    val driverCfg = linkedMapOf("version" to gpu.driver, "adrenotoolsTurnip" to "1", "resourceType" to "buffer", "bcnEmulation" to "auto", "quality" to "high")
+    if (gpu.useSystemDriver) driverCfg["vulkanVersion"] = "1.3"
+    overrides.filterKeys { !it.startsWith("env.") }.forEach { (k, v) -> driverCfg[k] = v }
+    val driverCfgStr = driverCfg.entries.joinToString(",") { "${it.key}=${it.value}" }
+    val envVars = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=0 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=${gpu.tuDebug} VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144  ${WowMachineIdentity.HOSTNAME_ENV}=${identity.computerName}$samsungEnv$extraEnv DXVK_LOG_LEVEL=info DXVK_LOG_PATH=/storage/emulated/0/Download"
     return JSONObject().apply {
         put("id", CONTAINER_ID)
         put("name", "WoW Forever")
         put("screenSize", screenSize)
         put("envVars", envVars)
         put("graphicsDriver", "Wrapper")
-        put("graphicsDriverConfig", "version=${gpu.driver},adrenotoolsTurnip=1,resourceType=buffer,bcnEmulation=auto,quality=high${if (gpu.useSystemDriver) ",vulkanVersion=1.3" else ""}")
+        put("graphicsDriverConfig", driverCfgStr)
         put("displayRenderer", "vulkan")
         put("dxwrapper", "dxvk-$DXVK_VERSION-1")
         put("dxwrapperConfig", "version=$DXVK_VERSION-1")
